@@ -8,7 +8,6 @@
 -- (run this block manually in psql or pgAdmin connected to the default 'postgres' db, NOT inside a transaction)
 -- DROP DATABASE IF EXISTS vct_db;
 -- CREATE DATABASE vct_db;
-SET ROLE postgres;
 DROP SCHEMA IF EXISTS vct CASCADE;
 CREATE SCHEMA IF NOT EXISTS vct;
 SET search_path TO vct;
@@ -16,7 +15,20 @@ SET search_path TO vct;
 -- PART 2.1: DROP (reverse FK order)
 -- ============================================================
 
-
+DROP TABLE IF EXISTS player_stats        CASCADE;
+DROP TABLE IF EXISTS match_maps          CASCADE;
+DROP TABLE IF EXISTS matches             CASCADE;
+DROP TABLE IF EXISTS tournament_teams    CASCADE;
+DROP TABLE IF EXISTS tournaments         CASCADE;
+DROP TABLE IF EXISTS tournament_types    CASCADE;
+DROP TABLE IF EXISTS team_players        CASCADE;
+DROP TABLE IF EXISTS team_coaches        CASCADE;
+DROP TABLE IF EXISTS coaches             CASCADE;
+DROP TABLE IF EXISTS players             CASCADE;
+DROP TABLE IF EXISTS teams               CASCADE;
+DROP TABLE IF EXISTS organisers          CASCADE;
+DROP TABLE IF EXISTS maps                CASCADE;
+DROP TABLE IF EXISTS agents              CASCADE;
 
 -- ============================================================
 -- PART 2.2: CREATE & CONSTRAINTS
@@ -861,44 +873,30 @@ WHERE nickname = 'CRWS'
 RETURNING coach_id;
 ROLLBACK;
 
--- ==================================
--- PART 6 - ROLES (GRANT/REVOKE)
--- ==================================
+-- -- ==================================
+-- -- PART 6 - ROLES (GRANT/REVOKE)
+-- -- ==================================
 
--- ==================================
--- PART 6 - ROLES (GRANT/REVOKE)
--- ==================================
+-- DROP ROLE IF EXISTS vct_db_readonly;
+-- DROP ROLE IF EXISTS vct_db_writer;
 
--- drop roles safely (re-runnable)
-DO $$ BEGIN
-  REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA vct FROM vct_db_readonly;
-  EXCEPTION WHEN undefined_object THEN NULL;
-END $$;
-DO $$ BEGIN
-  REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA vct FROM vct_db_writer;
-  EXCEPTION WHEN undefined_object THEN NULL;
-END $$;
+-- -- read-only role: analysts and observers who need to query match/roster data but must not modify it
+-- CREATE ROLE vct_db_readonly;
 
-DROP ROLE IF EXISTS vct_db_readonly;
-DROP ROLE IF EXISTS vct_db_writer;
+-- -- writer role: data entry staff who manage rosters and match results
+-- CREATE ROLE vct_db_writer;
 
--- read-only role: analysts and observers who need to query match/roster data but must not modify it
-CREATE ROLE vct_db_readonly;
+-- -- grant read access to all tables
+-- GRANT SELECT ON ALL TABLES IN SCHEMA vct TO vct_db_readonly;
 
--- writer role: data entry staff who manage rosters and match results
-CREATE ROLE vct_db_writer;
+-- -- grant insert + update on core roster/match tables
+-- GRANT INSERT, UPDATE ON teams TO vct_db_writer;
+-- GRANT INSERT, UPDATE ON players TO vct_db_writer;
+-- GRANT INSERT, UPDATE ON coaches TO vct_db_writer;
+-- GRANT INSERT, UPDATE ON team_players TO vct_db_writer;
+-- GRANT INSERT, UPDATE ON team_coaches TO vct_db_writer;
 
--- grant read access to all tables
-GRANT SELECT ON ALL TABLES IN SCHEMA vct TO vct_db_readonly;
-
--- grant insert + update on core roster/match tables
-GRANT INSERT, UPDATE ON teams TO vct_db_writer;
-GRANT INSERT, UPDATE ON players TO vct_db_writer;
-GRANT INSERT, UPDATE ON coaches TO vct_db_writer;
-GRANT INSERT, UPDATE ON team_players TO vct_db_writer;
-GRANT INSERT, UPDATE ON team_coaches TO vct_db_writer;
-
--- revoke UPDATE on junction tables: roster history must be append-only to preserve
--- accurate join/leave records — editing past entries would corrupt transfer history
-REVOKE UPDATE ON team_players FROM vct_db_writer;
-REVOKE UPDATE ON team_coaches FROM vct_db_writer;
+-- -- revoke UPDATE on junction tables: roster history must be append-only to preserve
+-- -- accurate join/leave records — editing past entries would corrupt transfer history
+-- REVOKE UPDATE ON team_players FROM vct_db_writer;
+-- REVOKE UPDATE ON team_coaches FROM vct_db_writer;
