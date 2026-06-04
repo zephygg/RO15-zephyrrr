@@ -8,18 +8,12 @@
 -- (run this block manually in psql or pgAdmin connected to the default 'postgres' db, NOT inside a transaction)
 -- DROP DATABASE IF EXISTS vct_db;
 -- CREATE DATABASE vct_db;
-SET ROLE postgres;
+
 DROP SCHEMA IF EXISTS vct CASCADE;
 CREATE SCHEMA IF NOT EXISTS vct;
 SET search_path TO vct;
 -- ============================================================
--- PART 2.1: DROP (reverse FK order)
--- ============================================================
-
-
-
--- ============================================================
--- PART 2.2: CREATE & CONSTRAINTS
+-- PART 2: CREATE & CONSTRAINTS
 -- ============================================================
 
 -- independent tables
@@ -855,15 +849,11 @@ WHERE team_name = 'FULL SENSE';
 
 -- after FULL SENSE came, they removed CRWS as the head coach
 
-BEGIN;
-DELETE FROM coaches
-WHERE nickname = 'CRWS'
-RETURNING coach_id;
-ROLLBACK;
-
--- ==================================
--- PART 6 - ROLES (GRANT/REVOKE)
--- ==================================
+-- BEGIN;
+-- DELETE FROM coaches
+-- WHERE nickname = 'CRWS'
+-- RETURNING coach_id;
+-- ROLLBACK;
 
 -- ==================================
 -- PART 6 - ROLES (GRANT/REVOKE)
@@ -882,23 +872,28 @@ END $$;
 DROP ROLE IF EXISTS vct_db_readonly;
 DROP ROLE IF EXISTS vct_db_writer;
 
--- read-only role: analysts and observers who need to query match/roster data but must not modify it
+-- read-only role: analysts/observers who query match & roster data, no modifications
 CREATE ROLE vct_db_readonly;
 
--- writer role: data entry staff who manage rosters and match results
+-- writer role: data entry staff managing rosters and match results
 CREATE ROLE vct_db_writer;
 
--- grant read access to all tables
+-- readonly: full SELECT across all tables
 GRANT SELECT ON ALL TABLES IN SCHEMA vct TO vct_db_readonly;
 
--- grant insert + update on core roster/match tables
-GRANT INSERT, UPDATE ON teams TO vct_db_writer;
-GRANT INSERT, UPDATE ON players TO vct_db_writer;
-GRANT INSERT, UPDATE ON coaches TO vct_db_writer;
-GRANT INSERT, UPDATE ON team_players TO vct_db_writer;
-GRANT INSERT, UPDATE ON team_coaches TO vct_db_writer;
+-- writer: insert + update on core roster/match tables
+GRANT INSERT, UPDATE ON teams            TO vct_db_writer;
+GRANT INSERT, UPDATE ON players          TO vct_db_writer;
+GRANT INSERT, UPDATE ON coaches          TO vct_db_writer;
+GRANT INSERT, UPDATE ON matches          TO vct_db_writer;
+GRANT INSERT, UPDATE ON match_maps       TO vct_db_writer;
+GRANT INSERT, UPDATE ON tournaments      TO vct_db_writer;
+GRANT INSERT, UPDATE ON tournament_teams TO vct_db_writer;
+GRANT INSERT, UPDATE ON player_stats     TO vct_db_writer;
+GRANT INSERT, UPDATE ON team_players     TO vct_db_writer;
+GRANT INSERT, UPDATE ON team_coaches     TO vct_db_writer;
 
--- revoke UPDATE on junction tables: roster history must be append-only to preserve
--- accurate join/leave records — editing past entries would corrupt transfer history
+-- junction tables (team_players, team_coaches) are append-only:
+-- editing past entries would corrupt transfer history, so UPDATE is revoked
 REVOKE UPDATE ON team_players FROM vct_db_writer;
 REVOKE UPDATE ON team_coaches FROM vct_db_writer;
